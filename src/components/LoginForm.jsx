@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 
 const LoginForm = ({ onLogin }) => {
   const [isLoginMode, setIsLoginMode] = useState(true);
-  
-  // 1. 입력 데이터를 관리할 상태 추가 (기존 UI 유지)
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -11,120 +13,158 @@ const LoginForm = ({ onLogin }) => {
     confirmPassword: ''
   });
 
-  // 2. 입력값 변경 감지 함수
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
+    setErrorMessage('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // 회원가입 시 비밀번호 일치 확인 (간이 검증)
     if (!isLoginMode && formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match.");
+      setErrorMessage('비밀번호가 일치하지 않습니다.');
       return;
     }
 
-    // 3. 백엔드 API 호출 (설정하신 AuthController 경로와 일치)
     const endpoint = isLoginMode ? '/api/auth/signin' : '/api/auth/signup';
-    
+    const payload = isLoginMode
+      ? { email: formData.email, password: formData.password }
+      : { username: formData.username, email: formData.email, password: formData.password };
+
     try {
       const response = await fetch(`http://localhost:8080${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
-        alert(isLoginMode ? 'Login Successful' : 'User Registered Successfully');
-        onLogin(); // 성공 시 대시보드로 이동
+        if (isLoginMode) {
+          const userInfo = await response.json();
+          setSuccessMessage('로그인 성공! 🎉');
+          setIsSuccess(true);
+          setTimeout(() => {
+            setIsSuccess(false);
+            onLogin(userInfo);
+          }, 1500);
+        } else {
+          setSuccessMessage('회원가입 성공! 🎉');
+          setIsSuccess(true);
+          setTimeout(() => {
+            setIsSuccess(false);
+            setIsLoginMode(true);
+          }, 1500);
+        }
       } else {
         const errorMsg = await response.text();
-        alert(`Error: ${errorMsg}`);
+        setErrorMessage(errorMsg);
       }
     } catch (error) {
-      console.error('Connection Error:', error);
-      alert('Could not connect to the server.');
+      setErrorMessage('서버에 연결할 수 없습니다.');
     }
   };
 
+  const handleModeSwitch = () => {
+    setIsLoginMode(!isLoginMode);
+    setFormData({ username: '', email: '', password: '', confirmPassword: '' });
+    setErrorMessage('');
+  };
+
+  if (isSuccess) {
+    return (
+      <div className="login-box" style={{ textAlign: 'center', padding: '60px 40px' }}>
+        <div style={{ fontSize: '64px', marginBottom: '20px' }}>✅</div>
+        <h2 style={{ color: 'var(--navy)', marginBottom: '12px' }}>{successMessage}</h2>
+        <p style={{ color: 'var(--text-gray)', fontSize: '15px' }}>잠시 후 이동합니다...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="login-box">
-      <h2>{isLoginMode ? 'Login' : 'Sign Up'}</h2>
+      <h2>{isLoginMode ? '로그인' : '회원가입'}</h2>
       <p className="login-subtitle">
-        {isLoginMode 
-          ? 'Please enter your credentials.' 
-          : 'Sign up to protect your prompts.'}
+        {isLoginMode ? '이메일과 비밀번호를 입력해주세요.' : '계정을 만들어 프롬프트를 안전하게 보호하세요.'}
       </p>
-      
-      <form onSubmit={handleSubmit}>
-        <div className="input-group">
-          <label>Username</label>
-          <input 
-            name="username" 
-            type="text" 
-            placeholder="Enter your ID" 
-            value={formData.username}
-            onChange={handleChange}
-            required 
-          />
-        </div>
 
+      {errorMessage && (
+        <div style={{
+          background: '#fff0f0',
+          border: '1px solid #ffcccc',
+          borderRadius: '12px',
+          padding: '12px 16px',
+          marginBottom: '16px',
+          color: '#cc0000',
+          fontSize: '14px',
+          textAlign: 'center'
+        }}>
+          ⚠️ {errorMessage}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit}>
         {!isLoginMode && (
           <div className="input-group">
-            <label>Email Address</label>
-            <input 
-              name="email" 
-              type="email" 
-              placeholder="example@email.com" 
-              value={formData.email}
+            <label>사용자 이름</label>
+            <input
+              name="username"
+              type="text"
+              placeholder="아이디를 입력하세요"
+              value={formData.username}
               onChange={handleChange}
-              required 
+              required
             />
           </div>
         )}
-        
+
         <div className="input-group">
-          <label>Password</label>
-          <input 
-            name="password" 
-            type="password" 
-            placeholder="Enter password" 
+          <label>이메일 주소</label>
+          <input
+            name="email"
+            type="email"
+            placeholder="example@email.com"
+            value={formData.email}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        <div className="input-group">
+          <label>비밀번호</label>
+          <input
+            name="password"
+            type="password"
+            placeholder="비밀번호를 입력하세요"
             value={formData.password}
             onChange={handleChange}
-            required 
+            required
           />
         </div>
 
         {!isLoginMode && (
           <div className="input-group">
-            <label>Confirm Password</label>
-            <input 
-              name="confirmPassword" 
-              type="password" 
-              placeholder="Confirm password" 
+            <label>비밀번호 확인</label>
+            <input
+              name="confirmPassword"
+              type="password"
+              placeholder="비밀번호를 다시 입력하세요"
               value={formData.confirmPassword}
               onChange={handleChange}
-              required 
+              required
             />
           </div>
         )}
-        
+
         <button type="submit" className="btn-login-submit">
-          {isLoginMode ? 'Login' : 'Sign Up'}
+          {isLoginMode ? '로그인' : '회원가입'}
         </button>
       </form>
-      
+
       <div className="login-footer">
-        <span>
-          {isLoginMode ? "Don't have an account? " : "Already have an account? "}
-        </span>
-        <span 
-          className="link-signup" 
-          onClick={() => setIsLoginMode(!isLoginMode)}
-        >
-          {isLoginMode ? 'Sign Up' : 'Login'}
+        <span>{isLoginMode ? '계정이 없으신가요? ' : '이미 계정이 있으신가요? '}</span>
+        <span className="link-signup" onClick={handleModeSwitch}>
+          {isLoginMode ? '회원가입' : '로그인'}
         </span>
       </div>
     </div>
